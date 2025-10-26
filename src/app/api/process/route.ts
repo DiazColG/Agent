@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import { NextRequest, NextResponse } from 'next/server';
+import { TwitterApi } from 'twitter-api-v2';
 
 type ActionType = 
   // Escritura & Contenido
@@ -14,7 +15,9 @@ type ActionType =
   // Creatividad & Marketing
   | 'naming' | 'adcopy' | 'videoscript' | 'birthday' | 'gift'
   // Estilo de Vida
-  | 'relationship';
+  | 'relationship'
+  // Social Intelligence
+  | 'pulse';
 
 const prompts: Record<ActionType, string> = {
   // Escritura & Contenido
@@ -90,6 +93,9 @@ const prompts: Record<ActionType, string> = {
   
   // Estilo de Vida
   relationship: 'Actúa como coach de relaciones y comunicación interpersonal certificado. Proporciona consejos profesionales, empáticos y constructivos sobre la situación de relaciones planteada. Cubre temas como: comunicación efectiva en pareja, manejo de conflictos, intimidad emocional y física (de forma apropiada y educativa), límites saludables, inteligencia emocional. Mantén un tono respetuoso, profesional y no juzgador. Basa tus consejos en principios de psicología y terapia de pareja. Mantén el idioma del usuario:',
+  
+  // Social Intelligence
+  pulse: 'NO USES ESTE PROMPT - Este action usa Twitter API directamente',
 };
 
 
@@ -104,6 +110,121 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // SPECIAL HANDLER: Pulse (Twitter Intelligence)
+    if (action === 'pulse') {
+      const twitterBearerToken = process.env.TWITTER_BEARER_TOKEN;
+      
+      if (!twitterBearerToken) {
+        return NextResponse.json(
+          { error: 'Twitter API no configurada. Agrega TWITTER_BEARER_TOKEN en variables de entorno.' },
+          { status: 500 }
+        );
+      }
+
+      try {
+        // Initialize Twitter client
+        const twitterClient = new TwitterApi(twitterBearerToken);
+        const roClient = twitterClient.readOnly;
+
+        // Search recent tweets (simplified query to avoid errors)
+        const searchQuery = text + ' -is:retweet'; // Exclude retweets only
+        
+        console.log('Twitter Query:', searchQuery);
+        console.log('Using token:', twitterBearerToken.substring(0, 20) + '...');
+        
+        const tweets = await roClient.v2.search(searchQuery, {
+          'tweet.fields': ['created_at', 'public_metrics', 'lang'],
+          max_results: 10, // Reducido a 10 para testing
+        });
+
+        const tweetsData = tweets.data.data || [];
+
+        if (tweetsData.length === 0) {
+          return NextResponse.json({ 
+            result: `❌ No se encontraron tweets recientes sobre "${text}". Intenta con otro tema o usa términos más generales.` 
+          });
+        }
+
+        // Prepare tweets text for AI analysis
+        const tweetsText = tweetsData
+          .map((tweet: any, i: number) => `Tweet ${i + 1}: ${tweet.text}`)
+          .join('\n\n');
+
+        // Use Groq AI to analyze tweets
+        const apiKey = process.env.GROQ_API_KEY;
+        if (!apiKey) {
+          return NextResponse.json(
+            { error: 'GROQ API key no configurada' },
+            { status: 500 }
+          );
+        }
+
+        const groq = new Groq({ apiKey });
+
+        const analysisPrompt = `Eres un experto analista de redes sociales y social listening. Analiza los siguientes ${tweetsData.length} tweets sobre "${text}" y proporciona:
+
+1. **📊 RESUMEN GENERAL** (2-3 líneas sobre qué se está hablando)
+2. **🔥 TEMAS PRINCIPALES** (Top 3 temas más mencionados)
+3. **💭 SENTIMIENTO PREDOMINANTE** (Positivo/Negativo/Neutral con % estimado)
+4. **📈 TENDENCIAS** (Qué está en aumento o disminuyendo)
+5. **🎯 INSIGHTS CLAVE** (2-3 conclusiones importantes)
+6. **⚠️ DISCLAIMER** (Recordar que esto es solo Twitter, no representa toda la población)
+
+Tweets a analizar:
+
+${tweetsText}
+
+Formatea tu respuesta de forma clara y estructurada. Usa emojis. Sé conciso pero informativo.`;
+
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: 'Eres un experto en análisis de redes sociales y social listening con experiencia en Twitter Analytics.',
+            },
+            {
+              role: 'user',
+              content: analysisPrompt,
+            },
+          ],
+          model: 'llama-3.3-70b-versatile',
+          temperature: 0.7,
+          max_tokens: 2000,
+        });
+
+        const analysis = completion.choices[0]?.message?.content || 'No se pudo analizar los tweets';
+
+        // Add metadata
+        const result = `🔥 **PULSE: Análisis en tiempo real de Twitter**\n\n` +
+          `📅 **Última actualización:** ${new Date().toLocaleString('es-AR')}\n` +
+          `📊 **Tweets analizados:** ${tweetsData.length}\n` +
+          `🔍 **Query:** "${text}"\n\n` +
+          `---\n\n${analysis}\n\n` +
+          `---\n\n` +
+          `💡 **Tip:** Refresca para obtener datos actualizados (Twitter se actualiza cada minuto)`;
+
+        return NextResponse.json({ result });
+
+      } catch (twitterError: any) {
+        console.error('Twitter API Error:', twitterError);
+        
+        let errorMsg = 'Error desconocido de Twitter API';
+        
+        if (twitterError.code === 429) {
+          errorMsg = `⚠️ **Rate Limit alcanzado**\n\nTwitter Free Tier limita a 15 requests cada 15 minutos.\n\n**Posibles causas:**\n1. Ya hiciste varias búsquedas recientemente\n2. Tu cuenta necesita verificación adicional en Twitter Developer Portal\n\n**Soluciones:**\n- Espera 15 minutos e intenta nuevamente\n- Verifica tu app en: https://developer.twitter.com/en/portal/dashboard\n- Asegúrate de tener "Essential" access level activado`;
+        } else if (twitterError.code === 400) {
+          errorMsg = `⚠️ **Query inválida**\n\nEl término de búsqueda no es válido.\n\n**Intenta:**\n- Usar palabras más simples (ej: "messi" en vez de "messi argentina gol")\n- Evitar caracteres especiales\n- Usar términos en inglés o español`;
+        } else if (twitterError.code === 401 || twitterError.code === 403) {
+          errorMsg = `⚠️ **Token inválido o sin permisos**\n\nTu Bearer Token no tiene los permisos correctos.\n\n**Verifica en Twitter Developer Portal:**\n1. Ve a tu App\n2. Settings → User authentication settings\n3. Asegúrate de tener "Read" permissions\n4. Regenera el Bearer Token si es necesario`;
+        } else {
+          errorMsg = `⚠️ **Error de Twitter API**\n\nCódigo: ${twitterError.code || 'desconocido'}\nMensaje: ${twitterError.message || 'Sin detalles'}\n\n**Más info:** https://developer.twitter.com/en/support/twitter-api/error-troubleshooting`;
+        }
+        
+        return NextResponse.json({ result: errorMsg });
+      }
+    }
+
+    // NORMAL HANDLER: All other agents use Groq AI
     const apiKey = process.env.GROQ_API_KEY;
     
     if (!apiKey || apiKey === 'tu_api_key_aqui') {

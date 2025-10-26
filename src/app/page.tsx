@@ -16,9 +16,11 @@ type ActionType =
   // Creatividad & Marketing
   | 'naming' | 'adcopy' | 'videoscript' | 'birthday' | 'gift'
   // Estilo de Vida
-  | 'relationship';
+  | 'relationship'
+  // Social Intelligence
+  | 'pulse';
 
-type Category = 'writing' | 'professional' | 'finance' | 'education' | 'creative' | 'lifestyle';
+type Category = 'writing' | 'professional' | 'finance' | 'education' | 'creative' | 'lifestyle' | 'social';
 
 interface RateLimitInfo {
   count: number;
@@ -184,6 +186,7 @@ export default function Home() {
     birthday: t.birthday,
     gift: t.gift,
     relationship: t.relationship,
+    pulse: '🔥 Pulse (Twitter)',
   };
 
   const placeholders: Record<ActionType, string> = {
@@ -227,6 +230,8 @@ export default function Home() {
     gift: 'Describe: persona, ocasión, presupuesto, intereses...',
     // Estilo de Vida
     relationship: 'Describe tu situación o consulta sobre relaciones, pareja, comunicación...',
+    // Social Intelligence
+    pulse: 'Escribe el tema que quieres analizar en Twitter (ej: elecciones argentina, bitcoin, messi)...',
   };
 
   const categories: Record<Category, { label: string; actions: ActionType[] }> = {
@@ -253,6 +258,10 @@ export default function Home() {
     lifestyle: {
       label: t.categoryLifestyle,
       actions: ['relationship'],
+    },
+    social: {
+      label: '🔥 Social Intelligence',
+      actions: ['pulse'],
     },
   };
 
