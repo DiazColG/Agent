@@ -23,13 +23,13 @@ export const metadata: Metadata = {
     type: "website",
     locale: "en_US",
     alternateLocale: ["es_ES", "pt_BR"],
-    url: "https://your-domain.vercel.app",
+    url: "https://agent-ten-blue.vercel.app",
     siteName: "Free AI Assistant - 33 AI Agents",
     title: "Free AI Assistant - 33 Specialized AI Agents | No Signup",
     description: "33 free AI tools for writing, career, finance, education and more. No registration required. Multi-language support.",
     images: [
       {
-        url: "https://your-domain.vercel.app/og-image.png",
+        url: "https://agent-ten-blue.vercel.app/og-image.png",
         width: 1200,
         height: 630,
         alt: "Free AI Assistant - 33 AI Agents",
@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     title: "Free AI Assistant - 33 AI Agents | No Signup",
     description: "33 free AI tools: writing, CV, finance, education & more. No registration needed.",
     creator: "@compound",
-    images: ["https://your-domain.vercel.app/og-image.png"],
+    images: ["https://agent-ten-blue.vercel.app/og-image.png"],
   },
   viewport: {
     width: "device-width",
@@ -52,11 +52,11 @@ export const metadata: Metadata = {
     google: "your-google-verification-code",
   },
   alternates: {
-    canonical: "https://your-domain.vercel.app",
+    canonical: "https://agent-ten-blue.vercel.app",
     languages: {
-      "en": "https://your-domain.vercel.app",
-      "es": "https://your-domain.vercel.app",
-      "pt": "https://your-domain.vercel.app",
+      "en": "https://agent-ten-blue.vercel.app",
+      "es": "https://agent-ten-blue.vercel.app",
+      "pt": "https://agent-ten-blue.vercel.app",
     },
   },
   category: "technology",
@@ -72,7 +72,7 @@ export default function RootLayout({
     "@type": "WebApplication",
     "name": "Free AI Assistant - 33 AI Agents",
     "description": "Free AI-powered tools with 33 specialized agents for writing, career, finance, education and more. No signup required.",
-    "url": "https://your-domain.vercel.app",
+    "url": "https://agent-ten-blue.vercel.app",
     "applicationCategory": "ProductivityApplication",
     "operatingSystem": "Any",
     "offers": {

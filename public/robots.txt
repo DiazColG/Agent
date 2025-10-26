@@ -6,7 +6,7 @@ Allow: /
 Crawl-delay: 0
 
 # Sitemap location
-Sitemap: https://your-domain.vercel.app/sitemap.xml
+Sitemap: https://agent-ten-blue.vercel.app/sitemap.xml
 
 # Block access to API routes (no SEO value)
 Disallow: /api/
