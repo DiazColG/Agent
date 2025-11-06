@@ -43,6 +43,7 @@ export interface Translations {
   financeterm: string;
   salary: string;
   businessmodel: string;
+  bankAnalyzer: string;
   
   // Actions - Education
   eli5: string;
@@ -79,7 +80,7 @@ export interface Translations {
 export const translations: Record<Language, Translations> = {
   es: {
     // Header
-    title: '🤖 33 Agentes IA en 1',
+    title: '🤖 35 Agentes IA en 1',
     subtitle: 'Tu asistente multifuncional con inteligencia artificial',
     requestsLeft: 'solicitudes disponibles hoy',
     
@@ -119,6 +120,7 @@ export const translations: Record<Language, Translations> = {
     financeterm: '🧾 Finanzas',
     salary: '💸 Salario',
     businessmodel: '📋 BMC',
+    bankAnalyzer: '🏦 Extractos',
     
     // Actions - Education
     eli5: '👨‍🏫 ELI5',
@@ -154,7 +156,7 @@ export const translations: Record<Language, Translations> = {
   
   en: {
     // Header
-    title: '🤖 33 AI Agents in 1',
+    title: '🤖 35 AI Agents in 1',
     subtitle: 'Your multifunctional AI assistant',
     requestsLeft: 'requests available today',
     
@@ -194,6 +196,7 @@ export const translations: Record<Language, Translations> = {
     financeterm: '🧾 Finance',
     salary: '💸 Salary',
     businessmodel: '📋 BMC',
+    bankAnalyzer: '🏦 Bank Statement',
     
     // Actions - Education
     eli5: '👨‍🏫 ELI5',
@@ -229,7 +232,7 @@ export const translations: Record<Language, Translations> = {
   
   pt: {
     // Header
-    title: '🤖 33 Agentes de IA em 1',
+    title: '🤖 35 Agentes de IA em 1',
     subtitle: 'Seu assistente multifuncional com inteligência artificial',
     requestsLeft: 'solicitações disponíveis hoje',
     
@@ -269,6 +272,7 @@ export const translations: Record<Language, Translations> = {
     financeterm: '🧾 Finanças',
     salary: '💸 Salário',
     businessmodel: '📋 BMC',
+    bankAnalyzer: '🏦 Extratos',
     
     // Actions - Education
     eli5: '👨‍🏫 ELI5',

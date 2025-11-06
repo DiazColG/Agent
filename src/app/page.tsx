@@ -10,7 +10,7 @@ type ActionType =
   // Profesional & Carrera
   | 'cv' | 'cover' | 'interview' | 'linkedin' | 'presentation'
   // Finanzas & Negocios
-  | 'finance' | 'business' | 'savings' | 'financeterm' | 'salary' | 'businessmodel'
+  | 'finance' | 'business' | 'savings' | 'financeterm' | 'salary' | 'businessmodel' | 'bankAnalyzer'
   // Educación & Aprendizaje
   | 'eli5' | 'quiz' | 'studysummary' | 'research' | 'language'
   // Creatividad & Marketing
@@ -39,6 +39,7 @@ export default function Home() {
   const [remainingRequests, setRemainingRequests] = useState<number | null>(null);
   const [showDonateTooltip, setShowDonateTooltip] = useState(false);
   const [language, setLanguage] = useState<Language>('es');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Detect language on mount
   useEffect(() => {
@@ -175,6 +176,7 @@ export default function Home() {
     financeterm: t.financeterm,
     salary: t.salary,
     businessmodel: t.businessmodel,
+    bankAnalyzer: t.bankAnalyzer,
     eli5: t.eli5,
     quiz: t.quiz,
     studysummary: t.studysummary,
@@ -216,6 +218,7 @@ export default function Home() {
     financeterm: 'Qué término financiero quieres que te explique...',
     salary: 'Describe: puesto actual, salario, logros, mercado...',
     businessmodel: 'Describe tu idea: problema, solución, cliente, propuesta de valor...',
+    bankAnalyzer: 'Sube tu extracto bancario (Excel o CSV)...',
     // Educación & Aprendizaje
     eli5: 'Qué concepto quieres que explique de forma simple...',
     quiz: 'Pega el tema/contenido para generar preguntas de estudio...',
@@ -245,7 +248,7 @@ export default function Home() {
     },
     finance: {
       label: t.categoryFinance,
-      actions: ['finance', 'business', 'savings', 'financeterm', 'salary', 'businessmodel'],
+      actions: ['finance', 'business', 'savings', 'financeterm', 'salary', 'businessmodel', 'bankAnalyzer'],
     },
     education: {
       label: t.categoryEducation,
@@ -288,7 +291,7 @@ export default function Home() {
         {/* SEO-Rich Hero Section */}
         <div className="text-center mb-8 max-w-4xl mx-auto">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 dark:text-white mb-4 leading-tight">
-            Free AI Assistant with <span className="text-indigo-600">33 Specialized Agents</span>
+            Free AI Assistant with <span className="text-indigo-600">35 Specialized Agents</span>
           </h1>
           <h2 className="text-xl md:text-2xl text-gray-700 dark:text-gray-300 mb-4 font-medium">
             No Signup Required • Unlimited Free Access • Multi-Language Support
@@ -359,7 +362,13 @@ export default function Home() {
                   <button
                     key={act}
                     type="button"
-                    onClick={() => setAction(act)}
+                    onClick={() => {
+                      setAction(act);
+                      setSelectedFile(null);
+                      setText('');
+                      setError('');
+                      setResult('');
+                    }}
                     className={`py-3 px-2 rounded-lg text-xs font-medium transition-all transform hover:scale-105 ${
                       action === act
                         ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg'
@@ -371,17 +380,67 @@ export default function Home() {
                 ))}
               </div>
 
-              {/* Text Area */}
+              {/* Input Area - Conditional: File Upload or Text Area */}
               <div className="mb-4">
                 <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                  💬 {actionLabels[action]}
+                  {action === 'bankAnalyzer' ? '� ' + actionLabels[action] : '�💬 ' + actionLabels[action]}
                 </label>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  className="w-full h-40 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none transition-all"
-                  placeholder={placeholders[action]}
-                />
+                
+                {action === 'bankAnalyzer' ? (
+                  <div>
+                    <input
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          setError('');
+                        }
+                      }}
+                      className="hidden"
+                      id="file-upload"
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className="flex items-center justify-center w-full h-40 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer transition-all bg-gray-50 dark:bg-gray-700/50"
+                    >
+                      <div className="text-center">
+                        {selectedFile ? (
+                          <>
+                            <div className="text-4xl mb-2">📄</div>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {selectedFile.name}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              {(selectedFile.size / 1024).toFixed(2)} KB
+                            </div>
+                            <div className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
+                              Click para cambiar archivo
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="text-4xl mb-2">📤</div>
+                            <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Click para seleccionar archivo
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Excel (.xlsx, .xls) o CSV (máx 10MB)
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </label>
+                  </div>
+                ) : (
+                  <textarea
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    className="w-full h-40 p-4 border-2 border-gray-200 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-none transition-all"
+                    placeholder={placeholders[action]}
+                  />
+                )}
               </div>
 
               {/* Submit Button */}
