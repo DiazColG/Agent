@@ -113,9 +113,17 @@ export default function Home() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!text.trim()) {
-      setError('Por favor ingresa un texto');
-      return;
+    // For bankAnalyzer, require file; for others, require text
+    if (action === 'bankAnalyzer') {
+      if (!selectedFile) {
+        setError('Por favor selecciona un archivo bancario (Excel o CSV)');
+        return;
+      }
+    } else {
+      if (!text.trim()) {
+        setError('Por favor ingresa un texto');
+        return;
+      }
     }
 
     if (!checkRateLimit()) {
@@ -128,21 +136,53 @@ export default function Home() {
     setResult('');
 
     try {
-      const response = await fetch('/api/process', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text, action }),
-      });
+      // Handle Bank Analyzer separately (file upload)
+      if (action === 'bankAnalyzer' && selectedFile) {
+        const formData = new FormData();
+        formData.append('file', selectedFile);
 
-      const data = await response.json();
+        const response = await fetch('/api/analyze-bank', {
+          method: 'POST',
+          body: formData,
+        });
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Error al procesar el texto');
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al procesar el archivo');
+        }
+
+        // Format the result nicely
+        const { summary, analysis } = data.data;
+        let resultText = `## 📊 Análisis de Extracto Bancario\n\n`;
+        resultText += `**Archivo:** ${selectedFile.name}\n`;
+        resultText += `**Período:** ${summary.period}\n`;
+        resultText += `**Transacciones:** ${summary.totalTransactions}\n`;
+        resultText += `**Ingresos:** $${summary.totalCredits.toFixed(2)}\n`;
+        resultText += `**Egresos:** $${summary.totalDebits.toFixed(2)}\n`;
+        resultText += `**Balance:** $${(summary.totalCredits - summary.totalDebits).toFixed(2)}\n\n`;
+        resultText += `---\n\n`;
+        resultText += analysis;
+
+        setResult(resultText);
+      } else {
+        // Handle regular text-based actions
+        const response = await fetch('/api/process', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ text, action }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Error al procesar el texto');
+        }
+
+        setResult(data.result);
       }
-
-      setResult(data.result);
     } catch (err: any) {
       const errorMessage = err.message || 'Hubo un error al procesar tu solicitud. Intenta nuevamente.';
       setError(errorMessage);
