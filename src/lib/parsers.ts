@@ -50,6 +50,9 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
     const headers = jsonData[headerRowIndex] as string[];
     const dataRows = jsonData.slice(headerRowIndex + 1);
     
+    // DEBUG: Log headers
+    console.log('📋 Headers detectados:', headers);
+    
     // Detect column indices - support both single amount column and debit/credit columns
     const dateCol = findColumnIndex(headers, ['fecha', 'date', 'data']);
     const descCol = findColumnIndex(headers, ['movimiento', 'descripcion', 'description', 'concepto', 'detalle', 'detail']);
@@ -64,6 +67,16 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
       : -1;
     
     const balanceCol = findColumnIndex(headers, ['saldo', 'balance', 'saldo parcial']);
+    
+    // DEBUG: Log detected columns
+    console.log('🔍 Columnas detectadas:', { 
+      dateCol, 
+      descCol, 
+      debitCol, 
+      creditCol, 
+      amountCol, 
+      balanceCol 
+    });
     
     const transactions: BankTransaction[] = [];
     
@@ -83,6 +96,16 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
         // Debit/Credit format
         const debit = debitCol >= 0 ? parseAmount(row[debitCol]) : 0;
         const credit = creditCol >= 0 ? parseAmount(row[creditCol]) : 0;
+        
+        // DEBUG: Log first few transactions
+        if (transactions.length < 3) {
+          console.log('💰 Transacción:', {
+            rawDebit: row[debitCol],
+            rawCredit: row[creditCol],
+            parsedDebit: debit,
+            parsedCredit: credit
+          });
+        }
         
         // If both are present, use the non-zero one
         // Debits are negative, credits are positive
@@ -112,6 +135,9 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
         type: parsedAmount >= 0 ? 'credit' : 'debit',
       });
     }
+    
+    // DEBUG: Log transaction count
+    console.log(`✅ Total transacciones parseadas: ${transactions.length}`);
     
     // Calculate summary
     const totalCredits = transactions
@@ -151,10 +177,21 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
  * Helper: Find column index by possible names
  */
 function findColumnIndex(headers: string[], possibleNames: string[]): number {
-  const lowerHeaders = headers.map(h => String(h).toLowerCase());
+  const lowerHeaders = headers.map(h => 
+    String(h || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove accents
+      .trim()
+  );
   
   for (const name of possibleNames) {
-    const index = lowerHeaders.findIndex(h => h.includes(name));
+    const normalizedName = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+    
+    const index = lowerHeaders.findIndex(h => h.includes(normalizedName));
     if (index >= 0) return index;
   }
   
