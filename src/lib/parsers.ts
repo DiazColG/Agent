@@ -50,11 +50,20 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
     const headers = jsonData[headerRowIndex] as string[];
     const dataRows = jsonData.slice(headerRowIndex + 1);
     
-    // Detect column indices
+    // Detect column indices - support both single amount column and debit/credit columns
     const dateCol = findColumnIndex(headers, ['fecha', 'date', 'data']);
-    const descCol = findColumnIndex(headers, ['descripcion', 'description', 'concepto', 'detalle', 'detail']);
-    const amountCol = findColumnIndex(headers, ['monto', 'amount', 'importe', 'valor']);
-    const balanceCol = findColumnIndex(headers, ['saldo', 'balance']);
+    const descCol = findColumnIndex(headers, ['movimiento', 'descripcion', 'description', 'concepto', 'detalle', 'detail']);
+    
+    // Try to find debit/credit columns first (common in bank statements)
+    const debitCol = findColumnIndex(headers, ['debito', 'débito', 'debit', 'cargo', 'egreso']);
+    const creditCol = findColumnIndex(headers, ['credito', 'crédito', 'credit', 'abono', 'ingreso']);
+    
+    // If no debit/credit, look for single amount column
+    const amountCol = (debitCol === -1 && creditCol === -1) 
+      ? findColumnIndex(headers, ['monto', 'amount', 'importe', 'valor'])
+      : -1;
+    
+    const balanceCol = findColumnIndex(headers, ['saldo', 'balance', 'saldo parcial']);
     
     const transactions: BankTransaction[] = [];
     
@@ -63,22 +72,41 @@ export async function parseExcelOrCSV(buffer: ArrayBuffer): Promise<ParsedBankDa
       
       const date = row[dateCol];
       const description = row[descCol];
-      const amount = row[amountCol];
       
       // Skip empty rows
-      if (!date && !description && !amount) continue;
+      if (!date && !description) continue;
       
-      // Parse amount (handle different formats: $1,234.56, 1.234,56, etc.)
+      // Calculate amount based on debit/credit or single amount column
       let parsedAmount = 0;
-      if (typeof amount === 'number') {
-        parsedAmount = amount;
-      } else if (typeof amount === 'string') {
-        parsedAmount = parseAmount(amount);
+      
+      if (debitCol >= 0 || creditCol >= 0) {
+        // Debit/Credit format
+        const debit = debitCol >= 0 ? parseAmount(row[debitCol]) : 0;
+        const credit = creditCol >= 0 ? parseAmount(row[creditCol]) : 0;
+        
+        // If both are present, use the non-zero one
+        // Debits are negative, credits are positive
+        if (debit !== 0) {
+          parsedAmount = -Math.abs(debit);
+        } else if (credit !== 0) {
+          parsedAmount = Math.abs(credit);
+        }
+      } else if (amountCol >= 0) {
+        // Single amount column
+        const amount = row[amountCol];
+        if (typeof amount === 'number') {
+          parsedAmount = amount;
+        } else if (typeof amount === 'string') {
+          parsedAmount = parseAmount(amount);
+        }
       }
+      
+      // Skip transactions with 0 amount and no description
+      if (parsedAmount === 0 && !description) continue;
       
       transactions.push({
         date: formatDate(date),
-        description: String(description || 'Sin descripción'),
+        description: String(description || 'Sin descripción').trim(),
         amount: parsedAmount,
         balance: balanceCol >= 0 ? parseAmount(row[balanceCol]) : undefined,
         type: parsedAmount >= 0 ? 'credit' : 'debit',
@@ -138,31 +166,87 @@ function findColumnIndex(headers: string[], possibleNames: string[]): number {
  */
 function parseAmount(value: any): number {
   if (typeof value === 'number') return value;
-  if (!value) return 0;
+  if (!value || value === '') return 0;
   
-  let str = String(value);
+  let str = String(value).trim();
   
-  // Remove currency symbols
-  str = str.replace(/[$€£¥₹]/g, '');
+  // Remove currency symbols and spaces
+  str = str.replace(/[$€£¥₹\s]/g, '');
   
-  // Detect format: 1,234.56 (US) vs 1.234,56 (EU)
-  const hasCommaDecimal = /\d+\.\d{3},\d{2}/.test(str);
+  // If empty after cleanup, return 0
+  if (!str) return 0;
   
-  if (hasCommaDecimal) {
-    // EU format: 1.234,56 -> 1234.56
-    str = str.replace(/\./g, '').replace(',', '.');
+  // Handle negative signs
+  const isNegative = str.includes('-') || str.startsWith('(');
+  str = str.replace(/[-()]/g, '');
+  
+  // Count dots and commas to determine format
+  const dotCount = (str.match(/\./g) || []).length;
+  const commaCount = (str.match(/,/g) || []).length;
+  
+  // Determine decimal separator
+  let result: number;
+  
+  if (dotCount === 0 && commaCount === 0) {
+    // No separators - simple number
+    result = parseFloat(str);
+  } else if (dotCount > 0 && commaCount === 0) {
+    // Only dots - could be 1.234.567,00 or 1234.56
+    const lastDotPos = str.lastIndexOf('.');
+    const afterLastDot = str.substring(lastDotPos + 1);
+    
+    if (afterLastDot.length === 2) {
+      // EU format: 1.234,56 but without comma (rare)
+      // Or could be thousands: 1.234
+      // Check if there are multiple dots
+      if (dotCount > 1) {
+        // Multiple dots = thousands separator
+        str = str.replace(/\./g, '');
+        result = parseFloat(str);
+      } else {
+        // Single dot with 2 decimals - ambiguous, assume decimal
+        result = parseFloat(str);
+      }
+    } else {
+      // US format: 1,234.56 (without comma) or just 1234.56
+      result = parseFloat(str.replace(/\./g, ''));
+    }
+  } else if (commaCount > 0 && dotCount === 0) {
+    // Only commas - could be 1,234,567 or 1234,56
+    const lastCommaPos = str.lastIndexOf(',');
+    const afterLastComma = str.substring(lastCommaPos + 1);
+    
+    if (afterLastComma.length === 2) {
+      // EU format: 1.234,56 (decimal comma)
+      str = str.replace(/,/, '.');
+      result = parseFloat(str);
+    } else {
+      // US format: 1,234,567 (thousands comma)
+      str = str.replace(/,/g, '');
+      result = parseFloat(str);
+    }
   } else {
-    // US format: 1,234.56 -> 1234.56
-    str = str.replace(/,/g, '');
+    // Both dots and commas present
+    const lastDotPos = str.lastIndexOf('.');
+    const lastCommaPos = str.lastIndexOf(',');
+    
+    if (lastCommaPos > lastDotPos) {
+      // EU format: 1.234,56 -> comma is decimal
+      str = str.replace(/\./g, '').replace(',', '.');
+      result = parseFloat(str);
+    } else {
+      // US format: 1,234.56 -> dot is decimal
+      str = str.replace(/,/g, '');
+      result = parseFloat(str);
+    }
   }
   
-  // Handle parentheses as negative (accounting format)
-  if (str.includes('(') && str.includes(')')) {
-    str = '-' + str.replace(/[()]/g, '');
+  // Apply negative if needed
+  if (isNegative && result > 0) {
+    result = -result;
   }
   
-  const num = parseFloat(str);
-  return isNaN(num) ? 0 : num;
+  return isNaN(result) ? 0 : result;
 }
 
 /**
